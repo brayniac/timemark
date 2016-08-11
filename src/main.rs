@@ -63,7 +63,7 @@ fn set_log_level(level: usize) {
 fn main() {
 	set_log_level(0);
 
-	let mut allan = Allan::new();
+	let mut allan = Allan::configure().max_tau(1_000_000).build().unwrap();
 
     loop {
     	let time_0 = time::precise_time_ns();
@@ -82,10 +82,7 @@ fn main() {
 	    info!("{} Hz", frequency);
 	    allan.record(frequency as f64);
 
-	    info!("ADEV: (   t=1) {}", allan.get(1).unwrap().deviation().unwrap_or(0.0));
-	    info!("ADEV: (  t=10) {}", allan.get(10).unwrap().deviation().unwrap_or(0.0));
-	    info!("ADEV: ( t=100) {}", allan.get(100).unwrap().deviation().unwrap_or(0.0));
-	    info!("ADEV: (t=1000) {}", allan.get(1000).unwrap().deviation().unwrap_or(0.0));
+	    allan.print();
     }
 }
 
