@@ -4,3 +4,11 @@ rust:
 os:
 - linux
 - osx
+matrix:
+  include:
+    - os: linux
+      rust: nightly
+      script: cargo bench
+    - os: osx
+      rust: nightly
+      script: cargo bench
