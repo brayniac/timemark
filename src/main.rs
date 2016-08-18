@@ -101,7 +101,7 @@ fn main() {
             for i in 0..6 {
                 for j in 1..10 {
                     let tau = 10_u64.pow(i) * j;
-                    let adev = allan.get(t as usize)
+                    let adev = allan.get(tau as usize)
                         .unwrap()
                         .deviation()
                         .unwrap_or(0.0);
