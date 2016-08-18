@@ -32,11 +32,11 @@ This will produce a binary at `./target/release/timemark` which can be run in-pl
 ## Sample Benchmark Output
 
 ```
-test tests::bench_instant_sub     ... bench:          60 ns/iter (+/- 2)
-test tests::bench_ns_sub          ... bench:          39 ns/iter (+/- 1)
-test tests::bench_precise_time_ns ... bench:          20 ns/iter (+/- 1)
+test tests::bench_instant_sub     ... bench:          57 ns/iter (+/- 3)
+test tests::bench_ns_sub          ... bench:          39 ns/iter (+/- 13)
+test tests::bench_precise_time_ns ... bench:          19 ns/iter (+/- 0)
 test tests::bench_rdtsc           ... bench:           8 ns/iter (+/- 0)
-test tests::bench_time_instant    ... bench:          26 ns/iter (+/- 1)
+test tests::bench_time_instant    ... bench:          25 ns/iter (+/- 1)
 ```
 
 Here we can see the added expense of working with std::time::Instant. Both subtraction of the `Instant` as well as reading it are longer than time::precise_time_ns(). Reading the CPU TSC is much faster than either method.
