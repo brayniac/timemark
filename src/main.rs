@@ -60,13 +60,24 @@ fn set_log_level(level: usize) {
     });
 }
 
+#[cfg(not(feature = "amd"))]
 #[allow(unused_mut)]
 pub fn rdtsc() -> u64 {
     let mut l: u32;
     let mut m: u32;
     unsafe {
-        asm!("rdtsc" : "={eax}" (l), "={edx}" (m) ::: "volatile");
+        asm!("lfence; rdtsc" : "={eax}" (l), "={edx}" (m) ::: "volatile");
+    }
+    ((m as u64) << 32) | (l as u64)
+}
 
+#[cfg(feature = "amd")]
+#[allow(unused_mut)]
+pub fn rdtsc() -> u64 {
+    let mut l: u32;
+    let mut m: u32;
+    unsafe {
+        asm!("mfence; rdtsc" : "={eax}" (l), "={edx}" (m) ::: "volatile");
     }
     ((m as u64) << 32) | (l as u64)
 }
