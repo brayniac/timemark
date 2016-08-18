@@ -4,12 +4,13 @@
 #[macro_use]
 extern crate log;
 
+extern crate allan;
+extern crate pad;
 extern crate test;
 extern crate time;
-extern crate shuteye;
-extern crate pad;
 
-extern crate allan;
+const ONE_MILISECOND: u64 = 1_000_000;
+const ONE_SECOND: u64 = 1_000 * ONE_MILISECOND;
 
 use pad::{PadStr, Alignment};
 use log::{LogLevel, LogLevelFilter, LogMetadata, LogRecord};
@@ -29,7 +30,7 @@ impl log::Log for SimpleLogger {
         if self.enabled(record.metadata()) {
             let ms = format!("{:.*}",
                              3,
-                             ((time::precise_time_ns() % 1_000_000_000) / 1_000_000));
+                             ((time::precise_time_ns() % ONE_SECOND) / ONE_MILISECOND));
             println!("{}.{} {:<5} [{}] {}",
                      time::strftime("%Y-%m-%d %H:%M:%S", &time::now()).unwrap(),
                      ms.pad(3, '0', Alignment::Right, true),
@@ -59,42 +60,80 @@ fn set_log_level(level: usize) {
     });
 }
 
+#[allow(unused_mut)]
+pub fn rdtsc() -> u64 {
+    let mut l: u32;
+    let mut m: u32;
+    unsafe {
+        asm!("rdtsc" : "={eax}" (l), "={edx}" (m) ::: "volatile");
+
+    }
+    ((m as u64) << 32) | (l as u64)
+}
 
 fn main() {
-	set_log_level(0);
+    set_log_level(0);
 
-	let mut allan = Allan::configure().max_tau(1_000_000).build().unwrap();
+    let mut allan =
+        Allan::configure().style(allan::Style::DecadeDeci).max_tau(1_000_000).build().unwrap();
+
+    info!("Calibrating tsc");
+    let _ = tsc_ghz(Duration::new(1, 0)); // warmup
+    let ghz = tsc_ghz(Duration::new(5, 0)); // real reading
+    info!("ghz: {}", ghz);
+
+    let t0 = time::precise_time_ns();
+    let a0 = rdtsc();
+
+    let mut t1 = t0 + ONE_SECOND;
 
     loop {
-    	let time_0 = time::precise_time_ns();
-	    let tsc_0 = rdtsc();
+        let t = time::precise_time_ns();
+        if t >= t1 {
+            let a1 = rdtsc(); // get tsc
+            let t2 = (a1 - a0) as f64 / ghz + t0 as f64;
+            let p = (t2 - t as f64) / ONE_SECOND as f64;
 
-	    shuteye::sleep(Duration::new(1,0));
+            info!("a1: {} t0: {} t1: {} t2: {}, p: {}", a1, t0, t1, t2, p);
 
-	    let time_1 = time::precise_time_ns();
-	    let tsc_1 = rdtsc();
+            allan.record(p);
 
-	    let time_d = time_1 - time_0;
-	    let tsc_d = tsc_0 - tsc_1;
-
-	    let frequency = tsc_d as f64 / time_d as f64/ 18444818948_f64;
-
-	    info!("{} Hz", frequency);
-	    allan.record(frequency as f64);
-
-	    allan.print();
+            for i in 0..6 {
+                for j in 1..10 {
+                    let tau = 10_u64.pow(i) * j;
+                    let adev = allan.get(t as usize)
+                        .unwrap()
+                        .deviation()
+                        .unwrap_or(0.0);
+                    info!("{:e} T={}", adev, tau);
+                }
+            }
+            t1 += ONE_SECOND;
+        }
     }
 }
 
-#[allow(unused_mut)]
-pub fn rdtsc() -> u64 {
-	unsafe {
-		let mut low: u32;
-	    let mut high: u32;
+fn tsc_ghz(duration: Duration) -> f64 {
+    let time_0 = time::precise_time_ns();
+    let tsc_0 = rdtsc();
 
-	    asm!("rdtsc" : "={eax}" (low), "={edx}" (high));
-	    ((high as u64) << 32) | (low as u64)
-	} 
+    let time_1 = time_0 + duration.as_secs() * ONE_SECOND;
+
+    let mut t = time::precise_time_ns();
+    loop {
+        if t >= time_1 {
+            break;
+        }
+        t = time::precise_time_ns();
+    }
+
+    let tsc = rdtsc();
+
+    let time_d = t - time_0;
+    let tsc_d = tsc - tsc_0;
+
+
+    (tsc_d) as f64 / time_d as f64
 }
 
 #[cfg(test)]
@@ -106,40 +145,34 @@ mod tests {
 
     #[bench]
     fn bench_precise_time_ns(b: &mut Bencher) {
-        b.iter(|| {
-        	time::precise_time_ns()
-        });
+        b.iter(|| time::precise_time_ns());
     }
 
     #[bench]
     fn bench_time_instant(b: &mut Bencher) {
-        b.iter(|| {
-        	Instant::now()
-        });
+        b.iter(|| Instant::now());
     }
 
     #[bench]
     fn bench_ns_sub(b: &mut Bencher) {
-    	b.iter(|| {
-    		let t0 = time::precise_time_ns();
-    		let t1 = time::precise_time_ns();
-    		t1 - t0
-    	});
+        b.iter(|| {
+            let t0 = time::precise_time_ns();
+            let t1 = time::precise_time_ns();
+            t1 - t0
+        });
     }
 
     #[bench]
     fn bench_instant_sub(b: &mut Bencher) {
-    	b.iter(|| {
-    		let t0 = Instant::now();
-    		let t1 = Instant::now();
-    		t1 - t0
-    	});
+        b.iter(|| {
+            let t0 = Instant::now();
+            let t1 = Instant::now();
+            t1 - t0
+        });
     }
 
     #[bench]
     fn bench_rdtsc(b: &mut Bencher) {
-    	b.iter(|| {
-    		rdtsc()
-    	});
+        b.iter(|| rdtsc());
     }
 }
