@@ -28,15 +28,19 @@ impl log::Log for SimpleLogger {
 
     fn log(&self, record: &LogRecord) {
         if self.enabled(record.metadata()) {
-            let ms = format!("{:.*}",
-                             3,
-                             ((time::precise_time_ns() % ONE_SECOND) / ONE_MILISECOND));
-            println!("{}.{} {:<5} [{}] {}",
-                     time::strftime("%Y-%m-%d %H:%M:%S", &time::now()).unwrap(),
-                     ms.pad(3, '0', Alignment::Right, true),
-                     record.level().to_string(),
-                     "timemark",
-                     record.args());
+            let ms = format!(
+                "{:.*}",
+                3,
+                ((time::precise_time_ns() % ONE_SECOND) / ONE_MILISECOND)
+            );
+            println!(
+                "{}.{} {:<5} [{}] {}",
+                time::strftime("%Y-%m-%d %H:%M:%S", &time::now()).unwrap(),
+                ms.pad(3, '0', Alignment::Right, true),
+                record.level().to_string(),
+                "timemark",
+                record.args()
+            );
         }
     }
 }
@@ -85,8 +89,11 @@ pub fn rdtsc() -> u64 {
 fn main() {
     set_log_level(0);
 
-    let mut allan =
-        Allan::configure().style(allan::Style::DecadeDeci).max_tau(1_000_000).build().unwrap();
+    let mut allan = Allan::configure()
+        .style(allan::Style::DecadeDeci)
+        .max_tau(1_000_000)
+        .build()
+        .unwrap();
 
     info!("Calibrating tsc");
     let _ = tsc_ghz(Duration::new(1, 0)); // warmup
@@ -112,10 +119,7 @@ fn main() {
             for i in 0..6 {
                 for j in 1..10 {
                     let tau = 10_u64.pow(i) * j;
-                    let adev = allan.get(tau as usize)
-                        .unwrap()
-                        .deviation()
-                        .unwrap_or(0.0);
+                    let adev = allan.get(tau as usize).unwrap().deviation().unwrap_or(0.0);
                     info!("{:e} T={}", adev, tau);
                 }
             }
